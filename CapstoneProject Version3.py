@@ -32,7 +32,7 @@ from keras.preprocessing import image
 
 # declaration for CNN model
                                 
-batch_size = 32
+batch_size = 1
 num_classes = 3
 epochs = 100
 data_augmentation = True
@@ -223,16 +223,24 @@ def TrainDataPrep(TrainDataPath):
     for imagePath in trainfileList:
         
         image = cv2.imread(imagePath)
-        image = cv2.resize(image, (28,28))
-        image = img_to_array(image)
-        train_data.append(image)
-        path = os.path.split(imagePath)
-        x = path[0]
-        label = x.split("\\")[4]
-        label = int(label)
-        train_labels_one_hot.append(label)
-        print(imagePath)
-        print(label)
+        if image is not None:
+            
+            #image = cv2.resize(image, (256, 360))
+            image = cv2.resize(image, (128, 128))
+            image = img_to_array(image)
+            #x = x.reshape((1,) + x.shape)
+            train_data.append(image)
+            train_data[0].shape
+            path = os.path.split(imagePath)
+            x = path[0]
+            label = x.split("\\")[5]
+            label = int(label)
+            train_labels_one_hot.append(label)
+            print(imagePath)
+            print(label)
+            
+        else:
+                print(imagePath,"image not loaded")
         
     train_data = np.array(train_data)
     train_labels_one_hot = np.array(train_labels_one_hot)
@@ -260,18 +268,24 @@ def TestDataPrep(TestDataPath):
     for imagePath in testfileList:
         
         image = cv2.imread(imagePath)
-        image = cv2.resize(image, (28, 28))
-        image = img_to_array(image)
-        #x = x.reshape((1,) + x.shape)
-        test_data.append(image)
-        test_data[0].shape
-        path = os.path.split(imagePath)
-        x = path[0]
-        label = x.split("\\")[4]
-        label = int(label)
-        test_labels_one_hot.append(label)
-        print(imagePath)
-        print(label)
+        if image is not None:
+            
+            #image = cv2.resize(image, (256, 360))
+            image = cv2.resize(image, (128, 128))
+            image = img_to_array(image)
+            #x = x.reshape((1,) + x.shape)
+            test_data.append(image)
+            test_data[0].shape
+            path = os.path.split(imagePath)
+            x = path[0]
+            label = x.split("\\")[5]
+            label = int(label)
+            test_labels_one_hot.append(label)
+            print(imagePath)
+            print(label)
+            
+        else:
+                print(imagePath,"image not loaded")
         
     
     test_data = np.array(test_data)
@@ -286,7 +300,7 @@ def TestDataPrep(TestDataPath):
 
 def YogaCNNModel(train_data,train_labels_one_hot,test_data,test_labels_one_hot,save_dir,model_name):
     
-
+    spe = int( np.ceil(train_data.shape[0] / batch_size) )
     
     print('train samples',train_data.shape)
     print('test samples',test_data.shape)
@@ -298,26 +312,35 @@ def YogaCNNModel(train_data,train_labels_one_hot,test_data,test_labels_one_hot,s
     
     
     model = Sequential()
-    model.add(Conv2D(32, (3, 3), padding='same',input_shape=(28,28,3)))
+    model.add(Conv2D(32, (3,3), padding='same',input_shape=(128,128,3)))
+    print('applying first CNN layer')
      
     model.add(Activation('relu'))
     model.add(Conv2D(32, (3, 3)))
+    
+    print('aplying second CNN layer')
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
+    print('applying third CNN layer')
     model.add(Dropout(0.25))
     
     model.add(Conv2D(64, (3, 3), padding='same'))
+    print('applying fourth CNN layer')
     model.add(Activation('relu'))
     model.add(Conv2D(64, (3, 3)))
+    
+    print('applying fivth CNN layer')
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(0.25))
     
     model.add(Flatten())
     model.add(Dense(128))
+    print('applying sixth CNN layer')
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
     model.add(Dense(num_classes))
+    print('applying seventh CNN layer')
     model.add(Activation('softmax'))
     
     # initiate RMSprop optimizer
@@ -333,6 +356,7 @@ def YogaCNNModel(train_data,train_labels_one_hot,test_data,test_labels_one_hot,s
     
     if not data_augmentation:
         print('Not using data augmentation.')
+        print('fitting CNN model without data augmentation')
         model.fit(train_data, train_labels_one_hot,
                   batch_size=batch_size,
                   epochs=epochs,
@@ -340,6 +364,7 @@ def YogaCNNModel(train_data,train_labels_one_hot,test_data,test_labels_one_hot,s
                   shuffle=True)
     else:
         print('Using real-time data augmentation.')
+        print('fitting CNN model with data augmentation')
         # This will do preprocessing and realtime data augmentation:
         datagen = ImageDataGenerator(
             featurewise_center=False,  # set input mean to 0 over the dataset
@@ -379,7 +404,7 @@ def YogaCNNModel(train_data,train_labels_one_hot,test_data,test_labels_one_hot,s
         #steps_per_epoch should be equivalent to the total number of samples divided by the batch size.
         model.fit_generator(datagen.flow(train_data, train_labels_one_hot,
                                          batch_size=batch_size),
-                            epochs=epochs,steps_per_epoch=2000,
+                            epochs=epochs,steps_per_epoch=spe,
                             validation_data=(test_data, test_labels_one_hot))
     
     # Save model and weights
@@ -395,12 +420,15 @@ def YogaCNNModel(train_data,train_labels_one_hot,test_data,test_labels_one_hot,s
     print('Test accuracy:', scores[1])
     
     #model.save("CBA-model.h5")
+    print('Trained on following stastics:')
+    print('train samples',train_data.shape)
+    print('test samples',test_data.shape)
+    print('train labels',train_labels_one_hot.shape)
+    print('test labels',test_labels_one_hot.shape)
 
     return scores[0],scores[1] 
 
                                 #FUNCTION MODULES end#
-
-
 
 #################### run the model####################
 
@@ -468,11 +496,11 @@ vctt = KeyFrame("C:\\SAProject\\SuryaNamskar\\yoga1.mp4","testyoga",xx,yy)
 
 
 # testing
-train_data,train_labels_one_hot = TrainDataPrep("C:\\SAProject\\Vid\\train") 
+train_data,train_labels_one_hot = TrainDataPrep("C:\\SAProject\\Vid\\train\\front") 
 # testing
-test_data,test_labels_one_hot = TestDataPrep("C:\\SAProject\\Vid\\test")  
+test_data,test_labels_one_hot = TestDataPrep("C:\\SAProject\\Vid\\test\\front")  
 
-x,y = YogaCNNModel(train_data,train_labels_one_hot,test_data,test_labels_one_hot,"test6CNNModel","test6YogaPose.h5")
+x,y = YogaCNNModel(train_data,train_labels_one_hot,test_data,test_labels_one_hot,"Pose1Pose2FrontCNNModel","Pose1Pose2FrontCNNModel.h5")
 
 
 ##################### model to predict on test dataset##############################
@@ -481,7 +509,7 @@ def PredictClass(modelPath,validationImagesPath):
 
    
     # dimensions of our images
-    img_width, img_height = 28, 28
+    img_width, img_height = 128, 128
     
     # load the model we saved
     model = load_model('C:\\SAProject\\Vid\\test6YogaPose.h5')
